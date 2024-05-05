@@ -18,6 +18,7 @@ void addBall();
 void addMatch();
 
 void execute(string query, int (*callback)(void *, int, char **, char **), void *vp);
+string buildValueList(vector<pair<string, bool>> values);
 
 int main(int argc, char *argv[]) {
     // switch first command line argument
@@ -127,6 +128,7 @@ void demo() {
 
 void addPlayer() {
     string fname = "", lname = "", residence, grip, height, weight, age;
+    vector<pair<string, bool>> values;
 
     // collect attribute data
     cout << "On each of the following lines, input the player information or press enter to skip (lines with an asterisk (*) cannot be skipped):" << endl;
@@ -156,11 +158,16 @@ void addPlayer() {
     string newID = to_string((*maxID) + 1);
 
     // build query
-    string query = "INSERT INTO PLAYER VALUES(" + newID + ", '" + fname + "', '" + lname + "', "
-        + (residence == "" ? "NULL" : ("'" + residence + "'")) + ", " + (height == "" ? "NULL" : height) + ", "
-        + (weight == "" ? "NULL" : weight) + ", " + (age == "" ? "NULL" : age) + ", "
-        + (grip == "" ? "NULL" : ("'" + grip + "'")) + ");";
-    
+    values.push_back(pair<string, bool>(newID, 0));
+    values.push_back(pair<string, bool>(fname, 1));
+    values.push_back(pair<string, bool>(lname, 1));
+    values.push_back(pair<string, bool>(residence, 1));
+    values.push_back(pair<string, bool>(height, 0));
+    values.push_back(pair<string, bool>(weight, 0));
+    values.push_back(pair<string, bool>(age, 0));
+    values.push_back(pair<string, bool>(grip, 1));
+    string query = "INSERT INTO PLAYER VALUES(" + buildValueList(values) + ");";
+
     // add player
     execute(query, NULL, NULL);
 }
@@ -197,4 +204,38 @@ void execute(string query, int (*callback)(void *, int, char **, char **), void 
 
     // close db connection
     sqlite3_close(db);
+}
+
+string buildValueList(vector<pair<string, bool>> values) {
+    string result = "";
+
+    // add first value to result
+    if (values[0].first == "") {
+        result += "NULL";
+    }
+    else {
+        if (values[0].second) {
+            result += "'" + values[0].first + "'";
+        }
+        else {
+            result += values[0].first;
+        }
+    }
+
+    // add remaining values
+    for (auto it = ++values.begin(); it != values.end(); it++) {
+        result += ", ";
+        if (it->first == "") {
+            result += "NULL";
+            continue;
+        }
+        if (it->second) {
+            result += "'" + it->first + "'";
+        }
+        else {
+            result += it->first;
+        }
+    }
+    cout << "result: \"" << result << "\"" << endl;
+    return result;
 }
