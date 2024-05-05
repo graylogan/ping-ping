@@ -1,3 +1,11 @@
+/* TO-DO:
+ * Fix REFERENCES constraint so it applies to new tuples
+ * Option to add paddles to a player
+ * Track first server for each game
+ * Make function parameters const pass by reference where possible
+*/
+
+
 #include <iostream>
 #include <fstream>
 #include <sqlite3.h>
@@ -16,6 +24,7 @@ void addPlayer();
 void addPaddle();
 void addBall();
 void addMatch();
+void addGame(string datetime, string p1, string p1Name, string p2, string p2Name, int gameNum);
 
 // sets up db connection, executes query, and closes the connection, printing any errors that happen
 void execute(string query, int (*callback)(void *, int, char **, char **), void *vp);
@@ -297,14 +306,21 @@ void addMatch() {
         cout << "There is no player with ID " << p2 << "." << endl;
         exit(69);
     }
+    p1Name += " (" + p1 + ")";
+    p2Name += " (" + p2 + ")";
 
     // add each game
-    string p1Points, p2Points, p1Edge, p2Edge, p1PadBrand, p1PadModel, p2PadBrand, p2PadModel, p1TableSide, ballBrand, ballTier;
-    vector<pair<string, bool>> values;
     for (int i = 0; i < numGames; i++) {
+        addGame(date + " " + time, p1, p1Name, p2, p2Name, i + 1);
+    }
+}
 
-        // collect game info
-        cout << "On each of the following lines, input information about game #" << i + 1
+void addGame(string datetime, string p1, string p1Name, string p2, string p2Name, int gameNum) {
+    vector<pair<string, bool>> values;
+    string p1Points, p2Points, p1Edge, p2Edge, p1PadBrand, p1PadModel, p2PadBrand, p2PadModel, p1TableSide, ballBrand, ballTier;
+
+    // collect game info
+        cout << "On each of the following lines, input information about game #" << gameNum
             << " or press enter to skip (lines with an asterisk (*) cannot be skipped):" << endl;
         while (p1Points == "") {
             cout << "*Points by " << p1Name << ": ";
@@ -334,8 +350,8 @@ void addMatch() {
         getline(cin, ballTier);
 
         // build query
-        values.push_back(pair<string, bool>(to_string(i + 1), 0));
-        values.push_back(pair<string, bool>(date + " " + time, 1));
+        values.push_back(pair<string, bool>(to_string(gameNum), 0));
+        values.push_back(pair<string, bool>(datetime, 1));
         values.push_back(pair<string, bool>(p1PadBrand, 1));
         values.push_back(pair<string, bool>(p1PadModel, 1));
         values.push_back(pair<string, bool>(p2PadBrand, 1));
@@ -352,17 +368,15 @@ void addMatch() {
 
         // add game
         execute("INSERT INTO GAME VALUES(" + buildValueList(values) + ");", NULL, NULL);
-
-        //clear values and variables
-        values.clear(); 
-        p1Points = p2Points = p1Edge = p2Edge = p1PadBrand = p1PadModel = p2PadBrand = p2PadModel = p1TableSide = ballBrand = ballTier = "";
-    }
 }
 
 void execute(string query, int (*callback)(void *, int, char **, char **), void *vp) {
     sqlite3 *db;
     char *err;
     int rc;
+
+    // enable foreign key constraint
+    query = "PRAGMA foreign_keys = ON; " + query;
 
     // open and connect database to db
     if (sqlite3_open("ping.db", &db)) {
