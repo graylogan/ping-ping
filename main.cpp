@@ -17,7 +17,10 @@ void addPaddle();
 void addBall();
 void addMatch();
 
+// sets up db connection, executes query, and closes the connection, printing any errors that happen
 void execute(string query, int (*callback)(void *, int, char **, char **), void *vp);
+// takes vector of pairs where first value is the attribute value and the second is a bool for if it needs to be quoted in the query
+// returns formated, comma-seperated list of values from the vector
 string buildValueList(vector<pair<string, bool>> values);
 
 int main(int argc, char *argv[]) {
@@ -173,7 +176,46 @@ void addPlayer() {
 }
 
 void addPaddle() {
+    string brand, model, weight, color;
+    vector<pair<string, bool>> values;
 
+    // collect attribute data
+    cout << "On each of the following lines, input the paddle information:" << endl;
+    while (brand == "") { // names are required
+        cout << "Brand: ";
+        getline(cin, brand);
+    }
+    while (model == "") {
+        cout << "Model: ";
+        getline(cin, model);
+    }
+    cout << "weight (optional): ";
+    getline(cin, weight);
+
+    // build query
+    values.push_back(pair<string, bool>(brand, 1));
+    values.push_back(pair<string, bool>(model, 1));
+    values.push_back(pair<string, bool>(weight, 0));
+    string query = "INSERT INTO PADDLE VALUES(" + buildValueList(values) + ");";
+
+    // add paddle
+    execute(query, NULL, NULL);
+
+    // remove weight value if it exists
+    if (values.size() == 3)
+        values.pop_back();
+
+    cout << "Enter as many paddle colors as you want, and press enter on an empty line when you are done." << endl;
+    cout << "Color: ";
+    getline(cin, color);
+    while (color != "") { // colect color, add it to table, repeat
+        values.push_back(pair<string, bool>(color, 1));
+        query = "INSERT INTO PADDLE_COLOR VALUES(" + buildValueList(values) + ");";
+        execute(query, NULL, NULL);
+        values.pop_back();
+        cout << "Color: ";
+        getline(cin, color);
+    }
 }
 
 void addBall() {
@@ -236,6 +278,5 @@ string buildValueList(vector<pair<string, bool>> values) {
             result += it->first;
         }
     }
-    cout << "result: \"" << result << "\"" << endl;
     return result;
 }
