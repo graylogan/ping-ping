@@ -5,39 +5,58 @@
 #include <string>
 #include <cstdio>
 #include <cstring>
+#include "callbacks.h"
+#include "print.h"
 using namespace std;
 
-static int callback(void *passedValue, int argc, char **argv, char **colName); // sqlite3_exec() returns query tuples here
 void usage(); // prints usage info and exits with status 1
 void init(); // reads sql file to configure schemas and create empty database
 void demo(); // creates a database populated with example tuples to demonstrate functionality
-void print();
+void addPlayer();
+void addPaddle();
+void addBall();
+void addMatch();
+
+void execute(string query, int (*callback)(void *, int, char **, char **), void *vp);
 
 int main(int argc, char *argv[]) {
-    // switch first argument that was passed
-    if (argc <= 1) // quit if no arguments were passed
+    // switch first command line argument
+    if (argc <= 1)
         usage();
+
     if (!strcmp(argv[1], "init")) {
         init();
         cout << "New database initialized" << endl;
     }
+
     else if (!strcmp(argv[1], "demo")) {
         demo();
         cout << "Demo database has been configured" << endl;
     }
+
     else if (!strcmp(argv[1], "print")) {
         print();
     }
-    return 0;
-}
 
-static int callback(void *passedValue, int argc, char **argv, char **colName) { // gets called for every row of result
-   int i;
-   for(i = 0; i<argc; i++) {
-      printf("%s = %s\n", colName[i], argv[i] ? argv[i] : "NULL");
-   }
-   printf("\n");
-   return 0;
+    else if (!strcmp(argv[1], "add")) {
+        if (argc <= 2)
+            usage();
+        else if (!strcmp(argv[2], "player"))
+            addPlayer();
+        else if (!strcmp(argv[2], "paddle"))
+            addPaddle();
+        else if (!strcmp(argv[2], "ball"))
+            addBall();
+        else if (!strcmp(argv[2], "match"))
+            addMatch();
+        else
+            usage();
+    }
+
+    else {
+        usage();
+    }
+    return 0;
 }
 
 void usage() {
@@ -138,7 +157,59 @@ void demo() {
     sqlite3_close(db);
 }
 
-void print() {
+void addPlayer() {
+    string fname = "", lname = "", residence, grip, height, weight, age;
+
+    // collect attribute data
+    cout << "On each of the following lines, input the player information or press enter to skip (lines with an asterisk (*) cannot be skipped):" << endl;
+    while (fname == "") { // names are required
+        cout << "*First name: ";
+        getline(cin, fname);
+    }
+    while (lname == "") {
+        cout << "*Last name: ";
+        getline(cin, lname);
+    }
+    cout << "Residence: ";
+    getline(cin, residence);
+    cout << "Height: ";
+    getline(cin, height);
+    cout << "Weight: ";
+    getline(cin, weight);
+    cout << "Age: ";
+    getline(cin, age);
+    cout << "Grip: ";
+    getline(cin, grip);
+    
+    // get next available ID
+    void *vmaxID = new int(0); // shares memory with callback
+    execute("SELECT max(ID) FROM PLAYER;", callbackAddPlayer, vmaxID);
+    int *maxID = static_cast<int*>(vmaxID); // convert to int* to access data
+    string newID = to_string((*maxID) + 1);
+
+    // build query
+    string query = "INSERT INTO PLAYER VALUES(" + newID + ", '" + fname + "', '" + lname + "', "
+        + (residence == "" ? "NULL" : ("'" + residence + "'")) + ", " + (height == "" ? "NULL" : height) + ", "
+        + (weight == "" ? "NULL" : weight) + ", " + (age == "" ? "NULL" : age) + ", "
+        + (grip == "" ? "NULL" : ("'" + grip + "'")) + ");";
+    
+    // add player
+    execute(query, NULL, NULL);
+}
+
+void addPaddle() {
+
+}
+
+void addBall() {
+
+}
+
+void addMatch() {
+
+}
+
+void execute(string query, int (*callback)(void *, int, char **, char **), void *vp) {
     sqlite3 *db;
     char *err;
     int rc;
@@ -149,43 +220,8 @@ void print() {
         exit(69);
     }
 
-    rc = sqlite3_exec(db, "SELECT * FROM PLAYER;", callback, 0, &err);
-    if (rc != 0) {
-        cout << err << endl;
-        sqlite3_free(err);
-    }
-
-    rc = sqlite3_exec(db, "SELECT * FROM PADDLE;", callback, 0, &err);
-    if (rc != 0) {
-        cout << err << endl;
-        sqlite3_free(err);
-    }
-
-    rc = sqlite3_exec(db, "SELECT * FROM PADDLE_COLOR;", callback, 0, &err);
-    if (rc != 0) {
-        cout << err << endl;
-        sqlite3_free(err);
-    }
-
-    rc = sqlite3_exec(db, "SELECT * FROM BALL;", callback, 0, &err);
-    if (rc != 0) {
-        cout << err << endl;
-        sqlite3_free(err);
-    }
-
-    rc = sqlite3_exec(db, "SELECT * FROM MATCH;", callback, 0, &err);
-    if (rc != 0) {
-        cout << err << endl;
-        sqlite3_free(err);
-    }
-
-    rc = sqlite3_exec(db, "SELECT * FROM GAME;", callback, 0, &err);
-    if (rc != 0) {
-        cout << err << endl;
-        sqlite3_free(err);
-    }
-
-    rc = sqlite3_exec(db, "SELECT * FROM OWNS;", callback, 0, &err);
+    // execute query
+    rc = sqlite3_exec(db, query.c_str(), callback, vp, &err); // execute query
     if (rc != 0) {
         cout << err << endl;
         sqlite3_free(err);
