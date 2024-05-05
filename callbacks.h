@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstdio>
+#include <string>
 using namespace std;
 
 static int callback(void *passedValue, int argc, char **argv, char **colName) { // gets called for every row of result
@@ -15,9 +16,15 @@ static int callback(void *passedValue, int argc, char **argv, char **colName) { 
 }
 
 static int callbackAddPlayer(void *passedValue, int argc, char **argv, char **colName) {
-    int *iValue = static_cast<int*>(passedValue);
-    *iValue = (argv[0] == NULL ? 0 : stoi(string(argv[0])));
-    return 0;
+   int *iValue = static_cast<int*>(passedValue);
+   *iValue = (argv[0] == NULL ? 0 : stoi(string(argv[0])));
+   return 0;
+}
+
+static int callbackPlayerName(void *passedValue, int argc, char **argv, char **colName) {
+   string *sValue = static_cast<string*>(passedValue);
+   *sValue = string(argv[0]);
+   return 0;
 }
 
 #endif

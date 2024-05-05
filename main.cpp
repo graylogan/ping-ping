@@ -130,7 +130,7 @@ void demo() {
 }
 
 void addPlayer() {
-    string fname = "", lname = "", residence, grip, height, weight, age;
+    string fname, lname, residence, grip, height, weight, age;
     vector<pair<string, bool>> values;
 
     // collect attribute data
@@ -219,11 +219,144 @@ void addPaddle() {
 }
 
 void addBall() {
+    string brand, tier, design;
+    vector<pair<string, bool>> values;
 
+    // collect attribute data
+    cout << "On each of the following lines, input the ball information:" << endl;
+    while (brand == "") { // names are required
+        cout << "Brand: ";
+        getline(cin, brand);
+    }
+    while (tier == "") {
+        cout << "Tier: ";
+        getline(cin, tier);
+    }
+    cout << "Design: ";
+    getline(cin, design);
+
+    // build query
+    values.push_back(pair<string, bool>(brand, 1));
+    values.push_back(pair<string, bool>(tier, 0));
+    values.push_back(pair<string, bool>(design, 1));
+    string query = "INSERT INTO BALL VALUES(" + buildValueList(values) + ");";
+
+    // add ball
+    execute(query, NULL, NULL);
 }
 
 void addMatch() {
+    string numGamesStr, date, time, p1, p2;
+    int numGames;
 
+    // collect match information
+    cout << "Enter the following information about the match:" << endl;
+    while (date == "") {
+    cout << "Day (YYYY-MM-DD): ";
+    getline(cin, date);
+    }
+    while (time == "") {
+        cout << "Time (HH:MM): "; // !!! need seconds??
+        getline(cin, time);
+    }
+    while (p1 == "") {
+        cout << "Player 1 ID: ";
+        getline(cin, p1);
+    }
+    while (p2 == "") {
+        cout << "Player 2 ID: ";
+        getline(cin, p2);
+    }
+    while (numGamesStr == "") {
+        cout << "Number of games in match: ";
+        getline(cin, numGamesStr);
+    }
+    numGames = stoi(numGamesStr);
+    
+    // add match
+    string value = "'" + date + " " + time + "'";
+    execute("INSERT INTO MATCH VALUES(" + value + ");", NULL, NULL);
+
+    // get player names
+    string p1Name, p2Name;
+    void *vp = new string();
+    execute("SELECT FNAME FROM PLAYER WHERE ID = " + p1 + ";", callbackPlayerName, vp);
+    string *sp = static_cast<string*>(vp);
+    p1Name = *sp;
+    if (p1Name == "") {
+        cout << "There is no player with ID " << p1 << "." << endl;
+        exit(69);
+    }
+    delete sp;
+    sp = NULL;
+    vp = new string();
+    execute("SELECT FNAME FROM PLAYER WHERE ID = " + p2 + ";", callbackPlayerName, vp);
+    sp = static_cast<string*>(vp);
+    p2Name = *sp;
+    if (p2Name == "") {
+        cout << "There is no player with ID " << p2 << "." << endl;
+        exit(69);
+    }
+
+    // add each game
+    string p1Points, p2Points, p1Edge, p2Edge, p1PadBrand, p1PadModel, p2PadBrand, p2PadModel, p1TableSide, ballBrand, ballTier;
+    vector<pair<string, bool>> values;
+    for (int i = 0; i < numGames; i++) {
+
+        // collect game info
+        cout << "On each of the following lines, input information about game #" << i + 1
+            << " or press enter to skip (lines with an asterisk (*) cannot be skipped):" << endl;
+        while (p1Points == "") {
+            cout << "*Points by " << p1Name << ": ";
+            getline(cin, p1Points);
+        }
+        while (p2Points == "") {
+            cout << "*Points by " << p2Name << ": ";
+            getline(cin, p2Points);
+        }
+        cout << "Edge points by " << p1Name << ": ";
+        getline(cin, p1Edge);
+        cout << "Edge points by " << p2Name << ": ";
+        getline(cin, p2Edge);
+        cout << "Paddle brand of " << p1Name << ": ";
+        getline(cin, p1PadBrand);
+        cout << "Paddle Model of " << p1Name << ": ";
+        getline(cin, p1PadModel);
+        cout << "Paddle brand of " << p2Name << ": ";
+        getline(cin, p2PadBrand);
+        cout << "Paddle Model of " << p2Name << ": ";
+        getline(cin, p2PadModel);
+        cout << "Table side of " << p1Name << " (N=1, E=2, S=3, W=4): ";
+        getline(cin, p1TableSide);
+        cout << "Ball Brand: ";
+        getline(cin, ballBrand);
+        cout << "Ball Tier: ";
+        getline(cin, ballTier);
+
+        // build query
+        values.push_back(pair<string, bool>(to_string(i + 1), 0));
+        values.push_back(pair<string, bool>(date + " " + time, 1));
+        values.push_back(pair<string, bool>(p1PadBrand, 1));
+        values.push_back(pair<string, bool>(p1PadModel, 1));
+        values.push_back(pair<string, bool>(p2PadBrand, 1));
+        values.push_back(pair<string, bool>(p2PadModel, 1));
+        values.push_back(pair<string, bool>(p1, 0));
+        values.push_back(pair<string, bool>(p2, 0));
+        values.push_back(pair<string, bool>(p1Edge, 0));
+        values.push_back(pair<string, bool>(p2Edge, 0));
+        values.push_back(pair<string, bool>(p1TableSide, 0));
+        values.push_back(pair<string, bool>(p1Points, 0));
+        values.push_back(pair<string, bool>(p2Points, 0));
+        values.push_back(pair<string, bool>(ballBrand, 1));
+        values.push_back(pair<string, bool>(ballTier, 0));
+
+        // add game
+        execute("INSERT INTO GAME VALUES(" + buildValueList(values) + ");", NULL, NULL);
+
+        //clear values and variables
+        values.clear(); 
+        p1Points = p2Points = p1Edge = p2Edge = p1PadBrand = p1PadModel = p2PadBrand = p2PadModel = p1TableSide = ballBrand = ballTier = "";
+    }
 }
 
 void execute(string query, int (*callback)(void *, int, char **, char **), void *vp) {
@@ -278,5 +411,6 @@ string buildValueList(vector<pair<string, bool>> values) {
             result += it->first;
         }
     }
+    cout << "result: " << result << endl;
     return result;
 }
