@@ -3,6 +3,10 @@
  * Option to add paddles to a player
  * Track first server for each game
  * Make function parameters const pass by reference where possible
+ * Make inputs case insensitve
+ * Handle queries that may not return anything (ex info for invalid player ID)
+ * Make y/n prompts only accept y/n
+ * !!!!! MATCHES DO NOT ALWAYS GO TO TIEBRAKER !!!! AFFECTS SWEEP LOGIC
 */
 
 
@@ -13,8 +17,13 @@
 #include <string>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
+#include <iomanip>
+#include "execute.h"
 #include "callbacks.h"
+#include "stats.h"
 #include "print.h"
+#include "leadPlayer.h"
 using namespace std;
 
 void usage(); // prints usage info and exits with status 1
@@ -24,13 +33,20 @@ void addPlayer();
 void addPaddle();
 void addBall();
 void addMatch();
-void addGame(string datetime, string p1, string p1Name, string p2, string p2Name, int gameNum);
+bool addGame(string datetime, string p1, string p1Name, string p2, string p2Name, int gameNum);
+void playerInfo();
+void playerStats();
+void playerCompare();
+void leaderboard();
+void headToHead();
+void matchInfo();
 
 // sets up db connection, executes query, and closes the connection, printing any errors that happen
 void execute(string query, int (*callback)(void *, int, char **, char **), void *vp);
 // takes vector of pairs where first value is the attribute value and the second is a bool for if it needs to be quoted in the query
 // returns formated, comma-seperated list of values from the vector
 string buildValueList(vector<pair<string, bool>> values);
+string nameFromID(string id);
 
 int main(int argc, char *argv[]) {
     // switch first command line argument
@@ -66,6 +82,28 @@ int main(int argc, char *argv[]) {
             usage();
     }
 
+    else if (!strcmp(argv[1], "player")) {
+        if (argc <= 2)
+            usage();
+        else if (!strcmp(argv[2], "info"))
+            playerInfo();
+        else if (!strcmp(argv[2], "stats"))
+            playerStats();
+        else if (!strcmp(argv[2], "compare"))
+            playerCompare();
+        else
+            usage();
+    }
+
+    else if (!strcmp(argv[1], "leaderboard"))
+        leaderboard();
+    
+    else if (!strcmp(argv[1], "head-to-head"))
+        headToHead();
+
+    else if (argc > 2 && !strcmp(argv[1], "match") && !strcmp(argv[1], "info"))
+        matchInfo();
+    
     else {
         usage();
     }
@@ -310,12 +348,18 @@ void addMatch() {
     p2Name += " (" + p2 + ")";
 
     // add each game
+    pair<int, int> wins = pair<int, int>(0, 0);
     for (int i = 0; i < numGames; i++) {
-        addGame(date + " " + time, p1, p1Name, p2, p2Name, i + 1);
+        if(addGame(date + " " + time, p1, p1Name, p2, p2Name, i + 1))
+            wins.first++;
+        else
+            wins.second++;
+        if (wins.first > numGames / 2 || wins.second > numGames / 2)
+            break;
     }
 }
 
-void addGame(string datetime, string p1, string p1Name, string p2, string p2Name, int gameNum) {
+bool addGame(string datetime, string p1, string p1Name, string p2, string p2Name, int gameNum) {
     vector<pair<string, bool>> values;
     string p1Points, p2Points, p1Edge, p2Edge, p1PadBrand, p1PadModel, p2PadBrand, p2PadModel, p1TableSide, ballBrand, ballTier;
 
@@ -368,32 +412,240 @@ void addGame(string datetime, string p1, string p1Name, string p2, string p2Name
 
         // add game
         execute("INSERT INTO GAME VALUES(" + buildValueList(values) + ");", NULL, NULL);
+        return p1Points > p2Points;
 }
 
-void execute(string query, int (*callback)(void *, int, char **, char **), void *vp) {
-    sqlite3 *db;
-    char *err;
-    int rc;
+void playerInfo() {
+    string c, id, fname, lname;
 
-    // enable foreign key constraint
-    query = "PRAGMA foreign_keys = ON; " + query;
+    // has player ID?
+    cout << "Do you know the ID of the player you want information on [y/n]?: ";
+    getline(cin, c);
 
-    // open and connect database to db
-    if (sqlite3_open("ping.db", &db)) {
-        cout << "Failed to open database" << endl;
-        exit(69);
+    // retrieve info by ID
+    if (c == "y") {
+        while (id == "") {
+            cout << "Player ID: ";
+            getline(cin, id);
+        }
+        cout << endl;
+        execute("SELECT * FROM PLAYER WHERE ID = " + id + ";", callbackPlayerInfo, NULL);
+        return;
     }
 
-    // execute query
-    rc = sqlite3_exec(db, query.c_str(), callback, vp, &err); // execute query
-    if (rc != 0) {
-        cout << err << endl;
-        sqlite3_free(err);
+    // retrieve info by name
+    while (fname == "") {
+        cout << "First name: ";
+        getline(cin, fname);
     }
-
-    // close db connection
-    sqlite3_close(db);
+    while (lname == "") {
+        cout << "Last name: ";
+        getline(cin, lname);
+    }
+    cout << "Here is the information for all players with the name " << fname << " " << lname << ":\n" << endl;
+    execute("SELECT * FROM PLAYER WHERE FNAME = '" + fname + "' AND LNAME = '" + lname + "';", callbackPlayerInfo, NULL);
 }
+
+void playerStats() {
+    // collect player ID
+    string id;
+    while (id == "") {
+        cout << "Player ID: ";
+        getline(cin, id);
+    }
+
+    // populate involved timestamps
+    vector<string> timestamps = getTimestamps(id);
+
+    // get stats
+    int matchesWon = getMatchesWon(id, timestamps);
+    int sweeps = getSweeps(id, timestamps);
+    int rSweeps = getRSweeps(id, timestamps);
+    int totalGames = getGames(id, timestamps);
+    int gamesWon = getGamesWon(id, timestamps);
+    pair<int, int> points = getPoints(id);
+
+    // output stats
+    cout << "Matches played: " << timestamps.size() << endl;
+    cout << "Matches won: " << matchesWon << endl;
+    cout << "Matche win %: " << setprecision(4) << matchesWon * 1.0 / timestamps.size() << endl;
+    cout << "Sweeps: " << sweeps << endl;
+    cout << "Reverse sweeps: " << sweeps << endl;
+    cout << "Games played: " << totalGames << endl;
+    cout << "Games won: " << gamesWon << endl;
+    cout << "Game win %: " << setprecision(4) << gamesWon * 1.0 / totalGames << endl;
+    cout << "Total points: " << points.first << endl;
+    cout << "Total edge points: " << points.second << endl;
+}
+
+void playerCompare() {}
+void leaderboard() {
+    // collect stat
+    string stat;
+    while (stat == "") {
+        cout << "stat: ";
+        getline(cin, stat);
+    }
+
+    // get list of player IDs
+    void *vIDs = new vector<string>();
+    execute("SELECT ID FROM PLAYER;", callbackPlayerIDs, vIDs);
+    vector<string> *IDs = static_cast<vector<string>*>(vIDs);
+
+    // for each player, get their name and stat value to the leaderboard list
+    if (stat == "matches-played") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, timestamps.size()));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Matches Played" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "matches-won") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getMatchesWon(*it, timestamps)));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Matches Won" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "matches-lost") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, timestamps.size() - getMatchesWon(*it, timestamps)));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Matches Lost" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "match-win-percent") {
+        vector<LeadPlayer<double>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<double>(nameFromID(*it), *it, (timestamps.size() == 0 ? 0.0 : (1.0 * getMatchesWon(*it, timestamps) / timestamps.size()))));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Match Win %" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %f\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "games-played") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getGames(*it, timestamps)));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Games Played" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "games-won") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getGamesWon(*it, timestamps)));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Games Won" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "games-lost") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getGames(*it, timestamps) - getGamesWon(*it, timestamps)));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Games Lost" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "game-win-percent") {
+        vector<LeadPlayer<double>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<double>(nameFromID(*it), *it, (getGames(*it, timestamps) == 0 ? 0.0 : (1.0 * getGamesWon(*it, timestamps) / getGames(*it, timestamps)))));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Game Win %" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %f\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "total-points") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getPoints(*it).first));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Total Points" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "total-edge-points") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getPoints(*it).second));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Total Edge Points" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "sweeps") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getSweeps(*it, timestamps)));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Sweeps" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else if (stat == "reverse-sweeps") {
+        vector<LeadPlayer<int>> leaderboard;
+        for (auto it = IDs->begin(); it != IDs->end(); it++) {
+            vector<string> timestamps = getTimestamps(*it);
+            leaderboard.push_back(LeadPlayer<int>(nameFromID(*it), *it, getRSweeps(*it, timestamps)));
+        }
+        sort(leaderboard.begin(), leaderboard.end());
+        cout << "RANK ID  NAME                   Reverse Sweeps" << endl;
+        for (int i = leaderboard.size() - 1; i >= 0; i--) {
+            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+        }
+    }
+    else {
+        usage();
+    }
+    // sort leaderboard list
+
+    // output table
+}
+void headToHead() {}
+void matchInfo() {}
 
 string buildValueList(vector<pair<string, bool>> values) {
     string result = "";
@@ -427,4 +679,10 @@ string buildValueList(vector<pair<string, bool>> values) {
     }
     cout << "result: " << result << endl;
     return result;
+}
+
+string nameFromID(string id) {
+    void *vName = new string();
+    execute("SELECT FNAME, LNAME FROM PLAYER WHERE ID = " + id + ";", callbackNameFromID, vName);
+    return *static_cast<string*>(vName);
 }
