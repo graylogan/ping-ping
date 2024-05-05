@@ -68,10 +68,7 @@ void init() {
     vector<string> queries;
     ifstream fin;
     string str;
-    sqlite3 *db;
-    char *err;
-    int rc;
-    
+
     // prompt user if database already exists
     fin.open("ping.db");
     if (fin.good()) {
@@ -88,12 +85,6 @@ void init() {
     // remove existing database
     remove("ping.db");
 
-    // open and connect database to db
-    if (sqlite3_open("ping.db", &db)) {
-        cout << "Failed to open database" << endl;
-        exit(69);
-    }
-
     // read in queries
     fin.open("init.sql");
     if (!fin.good()) {
@@ -106,33 +97,17 @@ void init() {
 
     // execute queries to initialize database
     for (auto it = queries.begin(); it != queries.end(); it++) {
-        rc = sqlite3_exec(db, it->c_str(), callback, 0, &err);
-        if (rc != 0) {
-            cout << err << endl;
-            sqlite3_free(err);
-        }
+        execute(*it, NULL, NULL);
     }
-
-    // close db connection
-    sqlite3_close(db);    
 }
 
 void demo() {
     vector<string> queries;
     ifstream fin;
     string str;
-    sqlite3 *db;
-    char *err;
-    int rc;
 
     // start by creating empty database
     init();
-
-    // open and connect database to db
-    if (sqlite3_open("ping.db", &db)) {
-        cout << "Failed to open database" << endl;
-        exit(69);
-    }
 
     // read in queries
     fin.open("demo.sql");
@@ -146,15 +121,8 @@ void demo() {
 
     // execute queries to populate database
     for (auto it = queries.begin(); it != queries.end(); it++) {
-        rc = sqlite3_exec(db, it->c_str(), callback, 0, &err);
-        if (rc != 0) {
-            cout << err << endl;
-            sqlite3_free(err);
-        }
+        execute(*it, NULL, NULL);
     }
-
-    // close db connection
-    sqlite3_close(db);
 }
 
 void addPlayer() {

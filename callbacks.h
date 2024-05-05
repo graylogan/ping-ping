@@ -15,10 +15,8 @@ static int callback(void *passedValue, int argc, char **argv, char **colName) { 
 }
 
 static int callbackAddPlayer(void *passedValue, int argc, char **argv, char **colName) {
-    cout << "initializing pointer..." << endl;
     int *iValue = static_cast<int*>(passedValue);
     *iValue = (argv[0] == NULL ? 0 : stoi(string(argv[0])));
-    cout << "pointer inited" << endl;
     return 0;
 }
 
