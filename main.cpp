@@ -429,7 +429,7 @@ bool addGame(string datetime, string p1, string p1Name, string p2, string p2Name
         getline(cin, p2PadBrand);
         cout << "Paddle Model of " << p2Name << ": ";
         getline(cin, p2PadModel);
-        cout << "Table side of " << p1Name << " (N=1, E=2, S=3, W=4): ";
+        cout << "Table side of " << p1Name << " (N=0, E=1, S=2, W=3): ";
         getline(cin, p1TableSide);
         cout << "Ball Brand: ";
         getline(cin, ballBrand);
