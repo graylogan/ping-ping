@@ -677,7 +677,7 @@ void playerStats() {
     // output stats
     cout << "Matches played: " << timestamps.size() << endl;
     cout << "Matches won: " << matchesWon << endl;
-    cout << "Matche win %: " << setprecision(4) << matchesWon * 1.0 / timestamps.size() << endl;
+    cout << "Match win %: " << setprecision(4) << matchesWon * 1.0 / timestamps.size() << endl;
     cout << "Sweeps: " << sweeps << endl;
     cout << "Reverse sweeps: " << sweeps << endl;
     cout << "Games played: " << totalGames << endl;
@@ -807,7 +807,7 @@ void leaderboard() {
         sort(leaderboard.begin(), leaderboard.end());
         cout << "RANK ID  NAME                   Total Points" << endl;
         for (int i = leaderboard.size() - 1; i >= 0; i--) {
-            printf("#%-3d %-3s %-22s %d\n", i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
+            printf("#%-3d %-3s %-22s %d\n", leaderboard.size() - i, leaderboard[i].id.c_str(), leaderboard[i].name.c_str(), leaderboard[i].stat);
         }
     }
     else if (stat == "total-edge-points") {
@@ -886,7 +886,6 @@ string buildValueList(vector<pair<string, bool>> values) {
             result += it->first;
         }
     }
-    cout << "result: " << result << endl;
     return result;
 }
 
