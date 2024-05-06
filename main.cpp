@@ -29,11 +29,19 @@ using namespace std;
 void usage(); // prints usage info and exits with status 1
 void init(); // reads sql file to configure schemas and create empty database
 void demo(); // creates a database populated with example tuples to demonstrate functionality
+
 void addPlayer();
 void addPaddle();
 void addBall();
 void addMatch();
+
 bool addGame(string datetime, string p1, string p1Name, string p2, string p2Name, int gameNum);
+
+void removePlayer();
+void removePaddle();
+void removeBall();
+void removeMatch();
+
 void playerInfo();
 void playerStats();
 void playerCompare();
@@ -78,6 +86,21 @@ int main(int argc, char *argv[]) {
             addBall();
         else if (!strcmp(argv[2], "match"))
             addMatch();
+        else
+            usage();
+    }
+
+    else if (!strcmp(argv[1], "remove")) {
+        if (argc <= 2)
+            usage();
+        else if (!strcmp(argv[2], "player"))
+            removePlayer();
+        else if (!strcmp(argv[2], "paddle"))
+            removePaddle();
+        else if (!strcmp(argv[2], "ball"))
+            removeBall();
+        else if (!strcmp(argv[2], "match"))
+            removeMatch();
         else
             usage();
     }
@@ -413,6 +436,58 @@ bool addGame(string datetime, string p1, string p1Name, string p2, string p2Name
         // add game
         execute("INSERT INTO GAME VALUES(" + buildValueList(values) + ");", NULL, NULL);
         return p1Points > p2Points;
+}
+
+void removePlayer() {
+    string id;
+    while (id == "") {
+        cout << "Player ID: ";
+        getline(cin, id);
+    }
+    execute("DELETE FROM PLAYER WHERE ID = " + id + ";", NULL, NULL);
+    cout << "Player removed." << endl;
+}
+
+void removePaddle() {
+    string brand, model;
+    while (brand == "") {
+        cout << "Brand: ";
+        getline(cin, brand);
+    }
+    while (model == "") {
+        cout << "Model: ";
+        getline(cin, model);
+    }
+    execute("DELETE FROM PADDLE WHERE BRAND = '" + brand + "' AND MODEL = '" + model + "';", NULL, NULL);
+    cout << "Paddle removed." << endl;
+}
+
+void removeBall() {
+    string brand, tier;
+    while (brand == "") {
+        cout << "Brand: ";
+        getline(cin, brand);
+    }
+    while (tier == "") {
+        cout << "Tier: ";
+        getline(cin, tier);
+    }
+    execute("DELETE FROM BALL WHERE BRAND = '" + brand + "' AND TIER = " + tier + ";", NULL, NULL);
+    cout << "Ball removed." << endl;
+}
+
+void removeMatch() {
+    string date, time;
+    while (date == "") {
+        cout << "Date (YYYY-MM-DD): ";
+        getline(cin, date);
+    }
+    while (time == "") {
+        cout << "Time (HH:MM): ";
+        getline(cin, time);
+    }
+    execute("DELETE FROM MATCH WHERE TIMESTAMP = '" + date + " " + time + "';", NULL, NULL);
+    cout << "Match removed." << endl;
 }
 
 void playerInfo() {
