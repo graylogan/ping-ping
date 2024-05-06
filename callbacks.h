@@ -77,4 +77,20 @@ static int callbackNameFromID(void * sharedMemory, int argc, char **argv, char *
    return 0;
 }
 
+static int callbackUpdatePlayer(void * sharedMemory, int argc, char **argv, char **colName) {
+   string *sValue = static_cast<string*>(sharedMemory);
+   for (int i = 1; i < argc; i++) {
+      sValue[i - 1] = (argv[i] == NULL ? "" : string(argv[i]));
+   }
+   return 0;
+}
+
+static int callbackUpdatePaddleBall(void * sharedMemory, int argc, char **argv, char **colName) {
+   string *sValue = static_cast<string*>(sharedMemory);
+   for (int i = 0; i < argc; i++) {
+      sValue[i] = (argv[i] == NULL ? "" : string(argv[i]));
+   }
+   return 0;
+}
+
 #endif

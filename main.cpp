@@ -1,12 +1,11 @@
 /* TO-DO:
- * Fix REFERENCES constraint so it applies to new tuples
+ * Add updateMatch()
  * Option to add paddles to a player
  * Track first server for each game
  * Make function parameters const pass by reference where possible
  * Make inputs case insensitve
  * Handle queries that may not return anything (ex info for invalid player ID)
  * Make y/n prompts only accept y/n
- * !!!!! MATCHES DO NOT ALWAYS GO TO TIEBRAKER !!!! AFFECTS SWEEP LOGIC
 */
 
 
@@ -41,6 +40,11 @@ void removePlayer();
 void removePaddle();
 void removeBall();
 void removeMatch();
+
+void updatePlayer();
+void updatePaddle();
+void updateBall();
+void updateMatch();
 
 void playerInfo();
 void playerStats();
@@ -105,6 +109,21 @@ int main(int argc, char *argv[]) {
             usage();
     }
 
+     else if (!strcmp(argv[1], "update")) {
+        if (argc <= 2)
+            usage();
+        else if (!strcmp(argv[2], "player"))
+            updatePlayer();
+        else if (!strcmp(argv[2], "paddle"))
+            updatePaddle();
+        else if (!strcmp(argv[2], "ball"))
+            updateBall();
+        else if (!strcmp(argv[2], "match"))
+            updateMatch();
+        else
+            usage();
+    }
+
     else if (!strcmp(argv[1], "player")) {
         if (argc <= 2)
             usage();
@@ -134,8 +153,9 @@ int main(int argc, char *argv[]) {
 }
 
 void usage() {
-    cout << "Usage: lol" << endl;
-    exit(69);
+    cout << "Usage: ping-ping init | demo | add { player | paddle | ball | match } | remove { player | paddle | ball | match } | "
+        << "update { player | paddle | ball | match } | player { info | stats } | leaderboard" << endl;
+    exit(1);
 }
 
 void init() {
@@ -163,7 +183,7 @@ void init() {
     fin.open("init.sql");
     if (!fin.good()) {
         cout << "Failed to read sql file" << endl;
-        exit(69);
+        exit(1);
     }
     while (getline(fin, str, ';')) {
         queries.push_back(str + ';');
@@ -187,7 +207,7 @@ void demo() {
     fin.open("demo.sql");
     if (!fin.good()) {
         cout << "Failed to read sql file" << endl;
-        exit(69);
+        exit(1);
     }
     while (getline(fin, str, ';')) {
         queries.push_back(str + ';');
@@ -355,7 +375,7 @@ void addMatch() {
     p1Name = *sp;
     if (p1Name == "") {
         cout << "There is no player with ID " << p1 << "." << endl;
-        exit(69);
+        exit(1);
     }
     delete sp;
     sp = NULL;
@@ -365,7 +385,7 @@ void addMatch() {
     p2Name = *sp;
     if (p2Name == "") {
         cout << "There is no player with ID " << p2 << "." << endl;
-        exit(69);
+        exit(1);
     }
     p1Name += " (" + p1 + ")";
     p2Name += " (" + p2 + ")";
@@ -488,6 +508,120 @@ void removeMatch() {
     }
     execute("DELETE FROM MATCH WHERE TIMESTAMP = '" + date + " " + time + "';", NULL, NULL);
     cout << "Match removed." << endl;
+}
+
+void updatePlayer() {
+    // collect id
+    string id;
+    while (id == "") {
+        cout << "Player ID: ";
+        getline(cin, id);
+    }
+
+    // collect old values
+    void *vValues = new string[7];
+    execute("SELECT * FROM PLAYER WHERE ID = " + id + ";", callbackUpdatePlayer, vValues);
+    string *values = static_cast<string*>(vValues);
+
+    // collect new values
+    string labels[7] = {"First name", "Last name", "Residence", "Height", "Weight", "Age", "Grip"};
+    string newValues[7];
+    cout << "For each player attribute, the current attribute will be displayed, and you will be prompted to enter a new attribute. If you don't want "
+         << "to change the attribute, just hit enter:" << endl;
+    for (int i = 0; i < 7; i++) {
+        cout << labels[i] << ": " << values[i] << endl;
+        cout << labels[i] << ": ";
+        getline(cin, newValues[i]);
+    }
+
+    // update to new values
+    string columns[7] = {"FNAME", "LNAME", "RESIDENCE", "HEIGHT", "WEIGHT", "AGE", "GRIP"};
+    bool quoted[7] = {1, 1, 1, 0, 0, 0, 1};   
+    for (int i = 0; i < 7; i++) {
+        execute("UPDATE PLAYER SET " + columns[i] + " = " + (newValues[i] == "" ? (quoted[i] ? "'" : "") + values[i] + (quoted[i] ? "'" : "")
+        : (newValues[i] == "NULL" ? "NULL" : (quoted[i] ? "'" : "") + newValues[i] + (quoted[i] ? "'" : ""))) + " WHERE ID = " + id + ";", NULL, NULL);
+    }
+    cout << "Player updated." << endl;
+}
+
+void updatePaddle() {
+    // collect key
+    string brand, model;
+    while (brand == "") {
+        cout << "Brand: ";
+        getline(cin, brand);
+    }
+    while (model == "") {
+        cout << "Model: ";
+        getline(cin, model);
+    }
+
+    // collect old values
+    void *vValues = new string[3];
+    execute("SELECT * FROM PADDLE WHERE BRAND = '" + brand + "' AND MODEL = '" + model + "';", callbackUpdatePaddleBall, vValues);
+    string *values = static_cast<string*>(vValues);
+
+    // collect new values
+    string labels[3] = {"Brand", "Model", "Weight"};
+    string newValues[3];
+    cout << "For each paddle attribute, the current attribute will be displayed, and you will be prompted to enter a new attribute. If you don't want "
+         << "to change the attribute, just hit enter:" << endl;
+    for (int i = 0; i < 3; i++) {
+        cout << labels[i] << ": " << values[i] << endl;
+        cout << labels[i] << ": ";
+        getline(cin, newValues[i]);
+    }
+
+    // update to new values
+    string columns[3] = {"BRAND", "MODEL", "WEIGHT"};
+    bool quoted[3] = {1, 1, 0};   
+    for (int i = 0; i < 3; i++) {
+        execute("UPDATE PADDLE SET " + columns[i] + " = " + (newValues[i] == "" ? (quoted[i] ? "'" : "") + values[i] + (quoted[i] ? "'" : "")
+        : (newValues[i] == "NULL" ? "NULL" : (quoted[i] ? "'" : "") + newValues[i] + (quoted[i] ? "'" : ""))) + " WHERE BRAND = '" + brand + "' AND MODEL = '" + model + "';", NULL, NULL);
+    }
+    cout << "Paddle updated." << endl;
+}
+
+void updateBall() {
+    // collect key
+    string brand, tier;
+    while (brand == "") {
+        cout << "Brand: ";
+        getline(cin, brand);
+    }
+    while (tier == "") {
+        cout << "Tier: ";
+        getline(cin, tier);
+    }
+
+    // collect old values
+    void *vValues = new string[3];
+    execute("SELECT * FROM BALL WHERE BRAND = '" + brand + "' AND TIER = " + tier + ";", callbackUpdatePaddleBall, vValues);
+    string *values = static_cast<string*>(vValues);
+
+    // collect new values
+    string labels[3] = {"Brand", "Tier", "Design"};
+    string newValues[3];
+    cout << "For each ball attribute, the current attribute will be displayed, and you will be prompted to enter a new attribute. If you don't want "
+         << "to change the attribute, just hit enter:" << endl;
+    for (int i = 0; i < 3; i++) {
+        cout << labels[i] << ": " << values[i] << endl;
+        cout << labels[i] << ": ";
+        getline(cin, newValues[i]);
+    }
+
+    // update to new values
+    string columns[3] = {"BRAND", "TIER", "DESIGN"};
+    bool quoted[3] = {1, 0, 1};   
+    for (int i = 0; i < 3; i++) {
+        execute("UPDATE BALL SET " + columns[i] + " = " + (newValues[i] == "" ? (quoted[i] ? "'" : "") + values[i] + (quoted[i] ? "'" : "")
+        : (newValues[i] == "NULL" ? "NULL" : (quoted[i] ? "'" : "") + newValues[i] + (quoted[i] ? "'" : ""))) + " WHERE BRAND = '" + brand + "' AND TIER = " + tier + ";", NULL, NULL);
+    }
+    cout << "Ball updated." << endl;
+}
+
+void updateMatch() {
+
 }
 
 void playerInfo() {
